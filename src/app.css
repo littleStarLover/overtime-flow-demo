@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Avenir Next', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #10243e;
+  background: #f4f7fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  height: 100%;
+  background: #f4f7fb;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(215, 25, 32, 0.25);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: #fff;
+  background: #d71920;
+}
+
+.mesh {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #c5d0dc;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lift {
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 45px rgba(16, 36, 62, 0.1);
+  }
+}
+
+@media (max-height: 850px) and (min-width: 1024px) {
+  .dashboard-hero {
+    display: none !important;
+  }
+}
+
+@media (max-height: 700px) {
+  .dashboard-chart {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .dashboard-workspace {
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .dashboard-chart {
+    display: none !important;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .dashboard-stats {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+
+  .dashboard-stats > * {
+    min-width: 0;
+  }
+
+  .dashboard-stats p:nth-child(3) {
+    display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  html {
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body {
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app-shell {
+    height: auto !important;
+    min-height: 100vh;
+    overflow: visible !important;
+  }
+
+  .app-main {
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .dashboard-page {
+    display: block !important;
+    height: auto !important;
+    min-height: 100vh;
+    overflow: visible !important;
+  }
+
+  .dashboard-workspace {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .dashboard-chart {
+    display: block !important;
+    margin-top: 1rem;
+  }
+}
