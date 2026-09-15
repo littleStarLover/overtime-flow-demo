@@ -1,12 +1,4 @@
-import type { OvertimeForm, OvertimeStatus } from '$lib/types';
-
-export const statusMeta: Record<OvertimeStatus, { label: string; className: string }> = {
-  draft: { label: '草稿', className: 'bg-slate-100 text-slate-600' },
-  pending: { label: '待审批', className: 'bg-amber-50 text-amber-700' },
-  approved: { label: '已通过', className: 'bg-emerald-50 text-emerald-700' },
-  rejected: { label: '已驳回', className: 'bg-rose-50 text-rose-700' },
-  withdrawn: { label: '已撤回', className: 'bg-slate-100 text-slate-500' }
-};
+import type { OvertimeForm } from '$lib/types';
 
 export function calculateHours(start: string, end: string): number {
   if (!start || !end) return 0;
@@ -35,19 +27,11 @@ export function validateOvertime(form: OvertimeForm): Record<string, string> {
   return errors;
 }
 
-export function nextStatus(
-  status: OvertimeStatus,
-  action: 'submit' | 'approve' | 'reject' | 'withdraw'
-): OvertimeStatus {
-  if (status === 'draft' && action === 'submit') return 'pending';
-  if (status === 'pending' && action === 'approve') return 'approved';
-  if (status === 'pending' && action === 'reject') return 'rejected';
-  if (status === 'pending' && action === 'withdraw') return 'withdrawn';
-  return status;
-}
-
 export function formatDate(date: string) {
+  if (!date) return '未填写';
+  const parsedDate = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) return date;
   return new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(
-    new Date(`${date}T00:00:00`)
+    parsedDate
   );
 }

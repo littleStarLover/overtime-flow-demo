@@ -1,33 +1,47 @@
 import { browser } from '$app/environment';
 import { writable } from 'svelte/store';
 import { seedApplications } from '$lib/mock/applications';
-import { calculateHours, nextStatus } from '$lib/utils/overtime';
-import type { OvertimeApplication, OvertimeForm } from '$lib/types';
+import { getProcessDefinition } from '$lib/workflow/definitions';
+import { createWorkflowInstance, transitionWorkflow } from '$lib/workflow/engine';
+import { prepareWorkflowForm } from '$lib/workflow/forms';
+import { migrateStoredWorkflows } from '$lib/workflow/migration';
+import type { WorkflowAction, WorkflowApplication, WorkflowFormData, WorkflowStatus } from '$lib/types';
 
-const storageKey = 'overtime-flow-applications';
+export const workflowStorageKey = 'workflow-instances';
+const legacyStorageKey = 'overtime-flow-applications';
 
-function loadApplications(): OvertimeApplication[] {
+function readStoredApplications(key: string): WorkflowApplication[] | null {
+  const stored = localStorage.getItem(key);
+  if (!stored) return null;
+
+  const parsed = JSON.parse(stored);
+  if (Array.isArray(parsed) && parsed.length === 0) return [];
+
+  const migrated = migrateStoredWorkflows(parsed);
+  return migrated.length ? migrated : null;
+}
+
+function loadApplications(): WorkflowApplication[] {
   if (!browser) return seedApplications;
 
   try {
-    const stored = localStorage.getItem(storageKey);
-    if (!stored) return seedApplications;
-
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed : seedApplications;
+    return readStoredApplications(workflowStorageKey)
+      ?? readStoredApplications(legacyStorageKey)
+      ?? seedApplications;
   } catch {
     return seedApplications;
   }
 }
 
-export const applications = writable<OvertimeApplication[]>(loadApplications());
+export const workflowInstances = writable<WorkflowApplication[]>(loadApplications());
+export const applications = workflowInstances;
 
 if (browser) {
-  applications.subscribe((value) => {
+  workflowInstances.subscribe((value) => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify(value));
+      localStorage.setItem(workflowStorageKey, JSON.stringify(value));
     } catch {
-      console.warn('Unable to persist overtime applications');
+      console.warn('Unable to persist workflow instances');
     }
   });
 }
@@ -36,46 +50,45 @@ function now() {
   return new Date().toISOString();
 }
 
-export function createApplication(form: OvertimeForm, status: OvertimeApplication['status'] = 'pending') {
-  const timestamp = now();
-  const id = `OT-${timestamp.slice(2, 10).replaceAll('-', '')}-${Math.floor(Math.random() * 90 + 10)}`;
-  const application: OvertimeApplication = {
-    id,
-    ...form,
-    hours: calculateHours(form.start, form.end),
-    status,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    history: status === 'pending' ? [{ action: '提交申请', actor: form.applicant, time: timestamp }] : []
-  };
+export function createApplication(processKey: string, form: WorkflowFormData, status: WorkflowStatus = 'pending') {
+  const definition = getProcessDefinition(processKey);
+  if (!definition) throw new Error(`Unknown process definition: ${processKey}`);
 
-  applications.update((items) => [application, ...items]);
-  return id;
+  const application = createWorkflowInstance(definition, prepareWorkflowForm(processKey, form), {
+    actor: String(form.applicant || '申请人'),
+    status
+  });
+
+  workflowInstances.update((items) => [application, ...items]);
+  return application.id;
 }
 
-export function updateDraft(id: string, form: OvertimeForm) {
+export function updateDraft(id: string, form: WorkflowFormData) {
   const timestamp = now();
 
-  applications.update((items) =>
+  workflowInstances.update((items) =>
     items.map((item) =>
       item.id === id && item.status === 'draft'
-        ? {
-            ...item,
-            ...form,
-            hours: calculateHours(form.start, form.end),
-            updatedAt: timestamp
-          }
+        ? { ...item, formData: prepareWorkflowForm(item.processKey, form), updatedAt: timestamp }
         : item
     )
   );
 }
 
-export function updateApplicationStatus(id: string, action: 'submit' | 'approve' | 'reject' | 'withdraw') {
-  applications.update((items) =>
+export function updateApplicationStatus(id: string, action: WorkflowAction) {
+  workflowInstances.update((items) =>
     items.map((item) => {
-      const status = nextStatus(item.status, action);
-      if (status === item.status) return item;
+      if (item.id !== id) return item;
 
+      const definition = getProcessDefinition(item.processKey);
+      if (!definition) return item;
+
+      const previousState = { status: item.status, currentStep: item.currentStep };
+      const nextState = transitionWorkflow(previousState, action, definition.approvalSteps.length);
+      if (nextState === previousState) return item;
+
+      const timestamp = now();
+      const activeStep = definition.approvalSteps[item.currentStep];
       const actionLabel =
         action === 'submit'
           ? '提交申请'
@@ -84,13 +97,23 @@ export function updateApplicationStatus(id: string, action: 'submit' | 'approve'
             : action === 'reject'
               ? '审批驳回'
               : '撤回申请';
+      const actor = action === 'submit' || action === 'withdraw'
+        ? String(item.formData.applicant || '申请人')
+        : activeStep?.assignee ?? activeStep?.roleName ?? '审批人';
+
       return {
         ...item,
-        status,
-        updatedAt: now(),
+        ...nextState,
+        updatedAt: timestamp,
         history: [
           ...item.history,
-          { action: actionLabel, actor: action === 'submit' || action === 'withdraw' ? item.applicant : '陈经理', time: now() }
+          {
+            action: actionLabel,
+            actor,
+            time: timestamp,
+            stepKey: action === 'approve' || action === 'reject' ? activeStep?.key : undefined,
+            stepName: action === 'approve' || action === 'reject' ? activeStep?.name : undefined
+          }
         ]
       };
     })

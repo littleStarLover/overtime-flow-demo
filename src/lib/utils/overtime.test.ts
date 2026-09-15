@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateHours, formatDate, nextStatus, validateOvertime } from './overtime';
+import { calculateHours, formatDate, validateOvertime } from './overtime';
 import type { OvertimeForm } from '$lib/types';
 
 const validForm: OvertimeForm = {
@@ -54,24 +54,13 @@ describe('validateOvertime', () => {
   });
 });
 
-describe('nextStatus', () => {
-  it.each([
-    ['draft', 'submit', 'pending'],
-    ['pending', 'approve', 'approved'],
-    ['pending', 'reject', 'rejected'],
-    ['pending', 'withdraw', 'withdrawn']
-  ] as const)('moves %s with %s to %s', (status, action, expected) => {
-    expect(nextStatus(status, action)).toBe(expected);
-  });
-
-  it('keeps the status unchanged for unsupported actions', () => {
-    expect(nextStatus('approved', 'approve')).toBe('approved');
-    expect(nextStatus('draft', 'approve')).toBe('draft');
-  });
-});
-
 describe('formatDate', () => {
   it('formats an ISO date for the Chinese interface', () => {
     expect(formatDate('2026-09-13')).toContain('9月13日');
+  });
+
+  it('keeps incomplete drafts safe to render', () => {
+    expect(formatDate('')).toBe('未填写');
+    expect(formatDate('not-a-date')).toBe('not-a-date');
   });
 });

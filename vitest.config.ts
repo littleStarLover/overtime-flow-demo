@@ -8,6 +8,24 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts'],
-    restoreMocks: true
+    restoreMocks: true,
+    slowTestThreshold: 300,
+    reporters: [
+      'default',
+      ['html', { outputDir: './reports/vitest' }],
+      'json'
+    ],
+    outputFile: {
+      json: './reports/vitest/results.json'
+    },
+    coverage: {
+      enabled: true,
+      provider: 'v8',
+      reportsDirectory: './reports/coverage',
+      reporter: ['text-summary', 'html', 'json-summary'],
+      reportOnFailure: true,
+      include: ['src/**/*.{ts,svelte}'],
+      exclude: ['src/**/*.test.ts', 'src/test/**', 'src/app.d.ts']
+    }
   }
 });

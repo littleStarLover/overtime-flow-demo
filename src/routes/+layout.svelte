@@ -6,19 +6,19 @@
 </script>
 
 <svelte:head>
-  <title>Overtime Desk · 加班申请</title>
+  <title>Flow Desk · 流程申请</title>
   <meta
     name="description"
-    content="一个轻量、清晰的加班申请与审批工作台。"
+    content="一个轻量、清晰的通用申请与审批工作台。"
   />
 </svelte:head>
 
 <div class="app-shell flex h-dvh flex-col overflow-hidden bg-mist text-ink lg:flex-row">
   <aside class="flex w-full shrink-0 flex-col bg-ink px-5 py-5 text-white lg:h-full lg:w-[248px] lg:px-6 lg:py-7">
     <a href="/" class="flex items-center gap-3" aria-label="返回申请工作台">
-      <span class="grid h-10 w-10 place-items-center rounded-xl bg-signal text-lg font-black tracking-tight">O</span>
+      <span class="grid h-10 w-10 place-items-center rounded-xl bg-signal text-lg font-black tracking-tight">F</span>
       <span>
-        <span class="block text-[15px] font-bold tracking-wide">Overtime Desk</span>
+        <span class="block text-[15px] font-bold tracking-wide">Flow Desk</span>
         <span class="mt-0.5 block text-[10px] uppercase tracking-[0.22em] text-slate-400">申请工作台</span>
       </span>
     </a>
@@ -36,7 +36,7 @@
         class:active={currentPath.startsWith('/applications/new')}
         class="flex min-w-max items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-300 transition hover:bg-white/10 hover:text-white"
       >
-        <span class="text-base">＋</span><span>发起加班申请</span>
+        <span class="text-base">＋</span><span>发起流程申请</span>
       </a>
     </nav>
 

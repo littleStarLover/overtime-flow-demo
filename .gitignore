@@ -3,6 +3,11 @@ node_modules/
 .pnpm-store/
 build/
 coverage/
+reports/
+.vitest/
+playwright-report/
+test-results/
+overtime-flow-demo/
 .env
 .env.*
 !.env.example

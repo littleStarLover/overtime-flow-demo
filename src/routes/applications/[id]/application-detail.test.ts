@@ -28,60 +28,70 @@ function resetApplications() {
   mocks.pageValue.params = { id: 'OT-260912-01' };
 }
 
-describe('application detail page', () => {
-  beforeEach(() => {
-    resetApplications();
-  });
+function showApplication(id: string) {
+  mocks.pageValue.params = { id };
+  mocks.pageValue.url = new URL(`http://localhost/applications/${id}`);
+}
 
-  it('renders application details, workflow history, and pending actions', () => {
+describe('application detail page', () => {
+  beforeEach(resetApplications);
+
+  it('renders configured fields, progress, history, and current handler', () => {
     render(ApplicationDetailPage);
 
     expect(screen.getByText('加班信息')).toBeInTheDocument();
-    expect(screen.getByText('流程记录')).toBeInTheDocument();
-    expect(screen.getAllByText('林晓雨')).toHaveLength(2);
-    expect(screen.getByText('提交申请')).toBeInTheDocument();
+    expect(screen.getByText('审批进度')).toBeInTheDocument();
+    expect(screen.getByText('完整流程记录')).toBeInTheDocument();
+    expect(screen.getAllByText(/陈经理 · 直属经理/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: '撤回' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '驳回' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '通过申请' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '通过当前节点' })).toBeInTheDocument();
   });
 
-  it('approves a pending application and records the workflow action', async () => {
+  it('approves a one-step overtime process', async () => {
     render(ApplicationDetailPage);
-
-    await fireEvent.click(screen.getByRole('button', { name: '通过申请' }));
+    await fireEvent.click(screen.getByRole('button', { name: '通过当前节点' }));
     const updated = get(applications).find((item) => item.id === 'OT-260912-01')!;
 
     expect(updated.status).toBe('approved');
-    expect(updated.history.at(-1)?.action).toBe('审批通过');
-    expect(screen.getByText('已通过')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '通过申请' })).not.toBeInTheDocument();
+    expect(updated.history.at(-1)).toMatchObject({ action: '审批通过', actor: '陈经理', stepKey: 'manager' });
+    expect(screen.getAllByText('已通过').length).toBeGreaterThan(0);
   });
 
-  it('rejects a pending application and records the workflow action', async () => {
+  it('moves a two-step leave process to its next role', async () => {
+    showApplication('LV-260907-05');
     render(ApplicationDetailPage);
 
+    expect(screen.getByText(/当前由/)).toHaveTextContent('林专员 · 人事专员');
+    expect(screen.getByText('人事审批')).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: '通过当前节点' }));
+
+    const updated = get(applications).find((item) => item.id === 'LV-260907-05')!;
+    expect(updated.status).toBe('approved');
+    expect(updated.history.at(-1)).toMatchObject({ actor: '林专员', stepKey: 'hr' });
+  });
+
+  it('rejects at the active process step', async () => {
+    render(ApplicationDetailPage);
     await fireEvent.click(screen.getByRole('button', { name: '驳回' }));
     const updated = get(applications).find((item) => item.id === 'OT-260912-01')!;
 
     expect(updated.status).toBe('rejected');
     expect(updated.history.at(-1)?.action).toBe('审批驳回');
-    expect(screen.getByText('已驳回')).toBeInTheDocument();
+    expect(screen.getAllByText('已驳回').length).toBeGreaterThan(0);
   });
 
-  it('shows draft actions for a draft application', () => {
-    mocks.pageValue.params = { id: 'OT-260908-04' };
-    mocks.pageValue.url = new URL('http://localhost/applications/OT-260908-04');
+  it('shows draft actions for any process draft', () => {
+    showApplication('OT-260908-04');
     render(ApplicationDetailPage);
 
-    expect(screen.getByText('王浩然')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '继续编辑' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '继续编辑' })).toHaveAttribute('href', '/applications/new?draft=OT-260908-04');
     expect(screen.getByRole('button', { name: '提交申请' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '通过申请' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '通过当前节点' })).not.toBeInTheDocument();
   });
 
   it('shows an empty state when the application does not exist', () => {
-    mocks.pageValue.params = { id: 'OT-NOT-FOUND' };
-    mocks.pageValue.url = new URL('http://localhost/applications/OT-NOT-FOUND');
+    showApplication('OT-NOT-FOUND');
     render(ApplicationDetailPage);
 
     expect(screen.getByText('申请不存在')).toBeInTheDocument();

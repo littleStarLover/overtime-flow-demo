@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { applications, createApplication, updateApplicationStatus, updateDraft } from './applications';
+import {
+  applications,
+  createApplication,
+  updateApplicationStatus,
+  updateDraft,
+  workflowStorageKey
+} from './applications';
 import { seedApplications } from '$lib/mock/applications';
 import type { OvertimeForm } from '$lib/types';
 
@@ -25,14 +31,15 @@ describe('applications store', () => {
   });
 
   it('creates a submitted application with calculated hours and history', () => {
-    const id = createApplication(form);
+    const id = createApplication('overtime', form);
     const created = get(applications)[0];
 
     expect(id).toMatch(/^OT-\d{6}-\d{2}$/);
     expect(created).toMatchObject({
       id,
-      ...form,
-      hours: 3.5,
+      processKey: 'overtime',
+      formData: { ...form, hours: 3.5 },
+      currentStep: 0,
       status: 'pending'
     });
     expect(created.history).toHaveLength(1);
@@ -40,14 +47,48 @@ describe('applications store', () => {
   });
 
   it('creates and updates a draft without submitting it', () => {
-    const id = createApplication(form, 'draft');
+    const id = createApplication('overtime', form, 'draft');
     updateDraft(id, { ...form, reason: '更新后的原因' });
     const draft = get(applications).find((item) => item.id === id);
 
     expect(draft?.status).toBe('draft');
-    expect(draft?.reason).toBe('更新后的原因');
-    expect(draft?.hours).toBe(3.5);
+    expect(draft?.formData.reason).toBe('更新后的原因');
+    expect(draft?.formData.hours).toBe(3.5);
     expect(draft?.history).toEqual([]);
+  });
+
+  it('creates leave and reimbursement instances from the shared store API', () => {
+    const leaveId = createApplication('leave', {
+      applicant: '测试用户', department: '测试部门', leaveType: 'annual',
+      startDate: '2026-09-15', endDate: '2026-09-17', reason: '家庭安排'
+    });
+    const reimbursementId = createApplication('reimbursement', {
+      applicant: '测试用户', department: '测试部门', expenseDate: '2026-09-15',
+      category: 'transport', amount: '128.50', description: '交通费'
+    });
+
+    expect(leaveId).toMatch(/^LV-/);
+    expect(reimbursementId).toMatch(/^RE-/);
+    expect(get(applications).find((item) => item.id === leaveId)?.formData.days).toBe(3);
+    expect(get(applications).find((item) => item.id === reimbursementId)?.formData.amount).toBe(128.5);
+  });
+
+  it('uses each active approval role across a two-step process', () => {
+    const leaveId = createApplication('leave', {
+      applicant: '测试用户', department: '测试部门', leaveType: 'annual',
+      startDate: '2026-09-15', endDate: '2026-09-16', reason: '两级审批验证'
+    });
+    updateApplicationStatus(leaveId, 'approve');
+    const managerApproved = get(applications).find((item) => item.id === leaveId)!;
+
+    expect(managerApproved).toMatchObject({ status: 'pending', currentStep: 1 });
+    expect(managerApproved.history.at(-1)).toMatchObject({ actor: '陈经理', stepKey: 'manager' });
+
+    updateApplicationStatus(leaveId, 'approve');
+    const approved = get(applications).find((item) => item.id === leaveId)!;
+
+    expect(approved.status).toBe('approved');
+    expect(approved.history.at(-1)).toMatchObject({ actor: '林专员', stepKey: 'hr', stepName: '人事审批' });
   });
 
   it('does not update a non-draft record through updateDraft', () => {
@@ -82,10 +123,11 @@ describe('applications store', () => {
   });
 
   it('persists store updates to localStorage', () => {
-    createApplication(form, 'draft');
-    const stored = JSON.parse(localStorage.getItem('overtime-flow-applications') || '[]');
+    createApplication('overtime', form, 'draft');
+    const stored = JSON.parse(localStorage.getItem(workflowStorageKey) || '[]');
 
     expect(stored).toHaveLength(seedApplications.length + 1);
     expect(stored[0].status).toBe('draft');
+    expect(stored[0].processKey).toBe('overtime');
   });
 });
